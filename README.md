@@ -1,63 +1,43 @@
+<div align="center">
+  <img src="docs/assets/midgaard-journey.png" alt="Five adventurers journey across the moonlit fields of Midgaard toward a medieval city" width="100%">
+</div>
+
 # Boukensha — an AI that learns to play a text adventure game
+
+This repository was built for the [Claude Code Camp by ExamPro](https://www.exampro.co).
 
 ## What is this project?
 
-A MUD ("Multi-User Dungeon") is an old-school, text-only online game: you
-type commands like `look`, `north`, or `attack goblin`, and the game replies
-in prose describing what happened. This project builds an AI agent —
-**Boukensha** — that plays one of these games entirely on its own: reading
-what the game says, deciding what to do, and typing its own commands back.
-No human at the keyboard.
+A MUD ("Multi-User Dungeon") is an old-school, text-only online game. You type commands such as `look`, `north`, or `attack goblin`, and the game responds with descriptions of what happened.
 
-It's a multi-week coding camp project, and the agent was built up in
-stages, one capability at a time — starting from "can it even hold a
-conversation with the game" and ending with an agent that sets itself a
-goal, checks whether it's actually making progress, and remembers what it
-learned the next time it logs in. It's been run against a real, live game
-server throughout, not just tested in theory.
+**Boukensha** is an AI agent that reads those responses, decides what to do, and sends commands back to the game. Rather than being given every move, it uses specialised AI roles to plan objectives, play, check progress, navigate a growing map, and remember what it learns across sessions.
 
-> Two real sessions against a live game server cost **$0.10** total, and
-> produced a genuine mid-session correction — the reviewer role paused the
-> agent partway through, decided to rethink its plan, and what it had
-> learned carried over into the next session. Full run recorded in
-> [`docs/journal/3_capable.md`](docs/journal/3_capable.md).
+The project was built incrementally during the coding camp and tested against a real CircleMUD server. Its current interface is a REPL: a human still supplies turn input, while the AI chooses and executes game commands. A fully autonomous outer session loop remains future work.
+
+> In two live sessions costing **$0.10 combined**, the Judge identified a reason to **replan**, and lessons saved from the first session informed planning in the second. The run is documented in [the Week 3 engineering journal](docs/journal/3_capable.md). These runs verify the planning, judging, and memory mechanisms—not that they outperform a single-agent baseline. The Navigator was available but not called in these sessions.
 
 ## The journey, week by week
 
 | Week | What was added |
 |---|---|
-| **Week 0 — Explore** | Learned to talk to the game at all: opening a raw text connection and sending/receiving commands. |
-| **Week 1 — Baseline** | The first working agent: read the game's text, decide on an action, send it — one exchange at a time. |
-| **Week 2 — Observability** | Gave the agent a memory of the game *world* (a map of rooms it has visited) and built a dashboard + tracing so a human can watch exactly what it saw and why it acted. |
-| **Week 3 — Capable** *(current)* | Gave the agent four new abilities: to **plan** ahead, **check** its own progress, **find its way** around, and **remember** lessons across separate play sessions. |
+| **Week 0 — Explore** | Connected to the text game and learned to send and receive commands. |
+| **Week 1 — Baseline** | Built the first working read → decide → act agent. |
+| **Week 2 — Observability** | Added a persistent room map, tracing, and a dashboard to inspect the agent's decisions. |
+| **Week 3 — Capable** *(current)* | Added planning, checkpoints, navigation assistance, and memory across sessions. |
 
 ## How Boukensha thinks
 
-One adventurer, five specialised AI roles. Together they help Boukensha explore Midgaard, make decisions, evaluate progress, and carry lessons into future sessions.
+One adventurer, five specialised AI roles. Four form the core process; the fifth, Navigator, helps when directions are needed.
 
-> **Pixel-art process illustration — coming soon.** A visual guide to the five roles will go here: four core stages (Plan → Play → Check → Remember), with Navigator helping the Player or Judge on demand. The illustration will use the same blue, green, red, yellow, and purple characters as the Midgaard artwork.
+![Pixel-art diagram of Boukensha's agent loop: Planner, Player, optional Navigator, Judge, verdicts, and Chronicler](docs/assets/agent-loop.png)
 
-**The core loop:** **Plan → Play → Check → Continue / Replan / Flag → Remember when needed.**
+**Plan → Play → Check.** The Judge decides whether to continue, replan, or flag an issue. Navigator can help the Player or Judge with routes on demand; Chronicler records lessons on a replan, flag, or session boundary. Those lessons can inform the next plan.
 
-| Role | What it does | When it runs |
-|---|---|---|
-| 🔵 **Planner — Plan** | Sets an objective, a few concrete steps, and a condition for stopping. | Before play starts, or when a new plan is needed. |
-| 🟢 **Player — Play** | Reads the game's text and takes actions such as moving, looking, and interacting. | During each player turn. |
-| 🔴 **Judge — Check** | Reviews progress and decides to **continue**, **replan**, or **flag** something for a human to inspect. | At configured checkpoints, or when an iteration limit is reached. |
-| 🟡 **Navigator — Find the way** | Consults the known room map to suggest routes or promising unexplored exits. It cannot move the character. | Only when the Player or Judge asks for help. |
-| 🟣 **Chronicler — Remember** | Writes a short record of discoveries, mistakes, strategies, and open threads for a future session. | On a **replan** or **flag**, or when a session ends or clears. |
-
-**What happens after a check?** A **continue** verdict lets play carry on; **replan** causes lessons to be recorded and a new plan to be prepared for the next turn; **flag** surfaces a warning without automatically stopping play. Memory is also saved at session boundaries, then made available to the Planner in a future session.
-
-These are **separate AI model calls**, not one model pretending to be five. Each role has a deliberately narrow set of permissions: the Judge and Navigator have read-only access, while the Chronicler and Planner have no game-action tools. The Navigator is *not* a mandatory fifth step in every turn.
-
-For implementation details, see the [Week 3 technical write-up](week3_capable/README.md).
+This is a **simplified process**, not a fixed sequence on every turn: checks happen at configured checkpoints, navigation is optional, and memory is written conditionally. Each role makes a separate AI model call with restricted permissions. See the [Week 3 technical write-up](week3_capable/README.md) for details.
 
 ## Architecture, for a closer look
 
-The overview above is the mental model; this diagram shows the actual
-components involved — for reviewers who want to see the shape of the
-system without reading source yet:
+The illustration above shows the mental model. This diagram shows how the roles connect to the actual game, map, and memory components:
 
 ```mermaid
 %%{init: {"flowchart": {"useMaxWidth": false}}}%%
@@ -90,30 +70,7 @@ flowchart TD
     Memory -.->|"read back next session"| Planner
 ```
 
-A few things worth knowing at a glance:
-
-- **Every 🤖 box is a separate API call**, not scripted logic — Planner,
-  Player, Judge, Navigator, and Chronicler are each configured
-  independently (provider + model, see Setup) and can run on different
-  models: a cheap one for a quick checkpoint, a stronger one for actual
-  play. Nothing here is one model pretending to be five.
-- **Judge and Navigator are permission-gated to read-only**, not just asked
-  nicely — the tools that would move the character are never even
-  registered for them, so calling one raises an error rather than being
-  refused.
-- **The knowledge store is one shared, in-process database**, not a second
-  server — the Judge and Navigator both query the same live room map. The
-  Player never needs to: room info is already pushed into its context every
-  turn for free, so a tool to re-ask would just be a round trip to learn
-  nothing.
-- **Memory only reaches the Player through the Planner**, and only gets
-  written on a `replan`/`flag` verdict or a session boundary (`/exit`,
-  `/clear`, EOF) — never on a plain `continue`, and never through the
-  Player's own tools.
-
-This intentionally leaves out session-compaction details, permission
-internals, and file-level wiring — see
-[`week3_capable/README.md`](week3_capable/README.md) for those.
+The Judge and Navigator are **permission-gated to read-only**. Both use the same in-process room map; the Player receives current-room context directly. The Chronicler writes a bounded memory digest at session boundaries or on `replan`/`flag`, and that memory reaches the Player **through the Planner**, not as an extra tool. For lower-level details, see [Week 3](week3_capable/README.md).
 
 <details>
 <summary>A real run (captured 2026-08-10, against a live CircleMUD server — $0.02, not staged)</summary>
@@ -163,43 +120,54 @@ Explore south toward Midgaard city to find NPCs, shops, or other areas.
 
 | Path | What's there |
 |---|---|
-| [`week0_explore/`](week0_explore/CHALLENGES.md) | The very first step — talking to the game over a raw connection |
+| [`week0_explore/`](week0_explore/CHALLENGES.md) | The first step — talking to the game over a raw connection |
 | [`week1_baseline/`](week1_baseline) | The first working agent, built one lesson at a time |
-| [`week2_observability/README.md`](week2_observability/README.md) | The world map, the dashboard, and tracing |
-| [`week3_capable/README.md`](week3_capable/README.md) | The full technical write-up of the Plan/Play/Check/Remember loop |
-| [`docs/plans/capability/`](docs/plans/capability) | Design docs written before Week 3 was built |
-| [`docs/journal/3_capable.md`](docs/journal/3_capable.md) | The engineering journal — what was tried, what surprised, what's still unproven |
+| [`week2_observability/README.md`](week2_observability/README.md) | The world map, dashboard, and tracing |
+| [`week3_capable/README.md`](week3_capable/README.md) | Technical details of the five specialised roles |
+| [`docs/plans/capability/`](docs/plans/capability) | Design documents written before Week 3 was built |
+| [`docs/journal/3_capable.md`](docs/journal/3_capable.md) | Engineering journal: tests, surprises, and open questions |
 
 ## Setup
 
-This section is technical — it's for anyone who wants to actually run the
-agent, not required reading otherwise.
+Run these commands from a **clone of the repository** unless a step says otherwise. This project is a development/camp build, not a one-command hosted service.
 
-### 1. Build & install the gems, in dependency order
+### 1. Prerequisites and game server
 
-`boukensha` spawns `mud-manager` as a subprocess by bare command name, so
-both need to resolve on `PATH`:
+You'll need **Ruby 3.0+**, RubyGems, an AI provider API key (Anthropic is the example below), and **Docker with Compose** to run the included CircleMUD server. Bundler is also needed for the dashboard and test commands. The terminal UI is optional; on Windows, use `boukensha --no-tui` if its `charm` dependencies are unavailable.
 
 ```sh
-cd week0_explore/mud_manager        # or week3_capable/mud_manager
-gem build mud_manager.gemspec
-gem install ./mud_manager-*.gem
-
-cd ../../week3_capable/boukensha
-gem build boukensha.gemspec
-gem install ./boukensha-*.gem
+cd week0_explore/infrastructure
+docker compose up --build -d
+cd ../..
 ```
 
-`week3_capable/bin/rebuild` does both steps for you, in this order.
+This starts CircleMUD at `localhost:4000`. Before running Boukensha, create or verify a game character on that server and set its **actual username and password** under `mcp_servers.mud.env` in `.boukensha/settings.yaml`. The example `dummy` / `helloworld` credentials below are **not guaranteed to exist** on a fresh server. See [CircleMUD infrastructure](week0_explore/infrastructure/README.md).
 
-### 2. Point `boukensha` at this repo's config
+### 2. Build and install the gems
+
+`boukensha` launches `mud-manager` by command name, so both installed executables must be on `PATH`. The repository's rebuild script builds and installs the Week 3 versions in the correct order:
+
+```sh
+ruby week3_capable/bin/rebuild
+```
+
+Alternatively, build and install `week3_capable/mud_manager` followed by `week3_capable/boukensha` manually. If your shell cannot find `mud-manager` or `boukensha`, check the RubyGems executable directory on `PATH`.
+
+### 3. Point `boukensha` at this repo's config
 
 By default `boukensha` looks for its config in `~/.boukensha`, not the
 repo. Point it at the repo-root `.boukensha/` instead — either per shell
 session:
 
 ```sh
-export BOUKENSHA_DIR="$(pwd)/.boukensha"   # run from the repo root
+# Bash / zsh, from the repository root
+export BOUKENSHA_DIR="$(pwd)/.boukensha"
+```
+
+On **PowerShell**, from the repository root:
+
+```powershell
+$env:BOUKENSHA_DIR = (Join-Path (Get-Location) '.boukensha')
 ```
 
 or once, in `~/.boukensharc`:
@@ -208,8 +176,7 @@ or once, in `~/.boukensharc`:
 boukensha_dir: /absolute/path/to/this/repo/.boukensha
 ```
 
-Either way, this is the `.boukensha/settings.yaml` (shared across weeks)
-that then actually gets read:
+The configuration lives in `.boukensha/settings.yaml` (shared across weeks). **The following is an illustrative excerpt, not the entire committed file:**
 
 ```yaml
 tasks:
@@ -231,10 +198,9 @@ mcp_servers:
       MUD_PASSWORD: helloworld
 ```
 
-Credentials travel via `env:` here, never through the model's own tool
-calls, so the agent itself never sees or sets them.
+Connection credentials are passed to `mud-manager` through the MCP server environment, not as model tool arguments. Replace the sample login values with your own. The committed configuration also includes logging and OpenTelemetry options: review those before running; the exporter expects a compatible local collector when tracing is enabled.
 
-### 3. `.boukensha/.env` (repo root, git-ignored)
+### 4. `.boukensha/.env` (repo root, git-ignored)
 
 ```sh
 ANTHROPIC_API_KEY=sk-ant-...
@@ -243,7 +209,9 @@ GEMINI_API_KEY=...
 OLLAMA_API_KEY=...
 ```
 
-### 4. Run
+Only define the key(s) for the provider(s) you use. Never commit this file or real credentials.
+
+### 5. Run
 
 ```sh
 boukensha              # TUI REPL
@@ -253,7 +221,7 @@ boukensha --no-tui     # plain-terminal REPL
 The character played is whichever `MUD_NAME` is set in
 `mcp_servers.mud.env` above.
 
-### 5. Optional: the dashboard
+### 6. Optional: the dashboard
 
 ```sh
 cd week3_capable/mud_monitor
@@ -261,9 +229,9 @@ bundle install
 bundle exec ruby bin/mud_monitor   # http://localhost:4568
 ```
 
-### 6. Optional: turn on Plan / Check / Remember
+### 7. Optional: turn on Plan / Check / Remember
 
-Off by default, so existing configs keep working unchanged:
+These optional capabilities are off unless explicitly enabled. Add the relevant blocks to your existing `tasks:` section, rather than replacing your entire settings file:
 
 ```yaml
 tasks:
@@ -289,10 +257,16 @@ memory:
 See [`week3_capable/README.md`](week3_capable/README.md) for the full set of
 options, including the Navigator.
 
-### 7. Tests
+### 8. Tests
 
 ```sh
-cd week3_capable/boukensha    && bundle exec rake test
-cd week3_capable/mud_manager  && bundle exec rake test
-cd week3_capable/mud_monitor  && bundle exec rake test
+(cd week3_capable/boukensha   && bundle exec rake test)
+(cd week3_capable/mud_manager && bundle exec rake test)
+(cd week3_capable/mud_monitor && bundle exec rake test)
 ```
+
+## Current status and next steps
+
+**Built and tested:** game interaction, a persistent room map and observability tools, specialised planning and judging roles, an optional read-only Navigator, and cross-session memory. Two live sessions demonstrated a real `replan` verdict and memory carried into a subsequent plan.
+
+**Still to investigate:** a fully autonomous session-driving loop, whether orchestration improves outcomes over the Week 2 baseline, how often Navigator proves useful in live play, and how well memory retains important lessons over longer runs. The [engineering journal](docs/journal/3_capable.md) records the evidence and limitations.
