@@ -1,10 +1,8 @@
 <div align="center">
-  <img src="docs/assets/midgaard-journey.png" alt="Five adventurers journey across the moonlit fields of Midgaard toward a medieval city" width="100%">
+  <img src="midgaard-journey.png" alt="Five adventurers journey across the moonlit fields of Midgaard toward a medieval city" width="100%">
 </div>
 
 # Boukensha — an AI that learns to play a text adventure game
-
-This repository was built for the [Claude Code Camp by ExamPro](https://www.exampro.co).
 
 ## What is this project?
 
@@ -29,92 +27,95 @@ The project was built incrementally during the coding camp and tested against a 
 
 One adventurer, five specialised AI roles. Four form the core process; the fifth, Navigator, helps when directions are needed.
 
-![Pixel-art diagram of Boukensha's agent loop: Planner, Player, optional Navigator, Judge, verdicts, and Chronicler](docs/assets/agent-loop.png)
+![Pixel-art diagram of Boukensha's agent loop: Planner, Player, optional Navigator, Judge, verdicts, and Chronicler](agent-loop.png)
 
-**Plan → Play → Check.** The Judge decides whether to continue, replan, or flag an issue. Navigator can help the Player or Judge with routes on demand; Chronicler records lessons on a replan, flag, or session boundary. Those lessons can inform the next plan.
+**Plan → Play → Check → Remember.** The Judge decides whether to continue, replan, or flag an issue. Navigator can help the Player or Judge with routes on demand; Chronicler records lessons on a replan, flag, or session boundary. Those lessons can inform the next plan.
 
 This is a **simplified process**, not a fixed sequence on every turn: checks happen at configured checkpoints, navigation is optional, and memory is written conditionally. Each role makes a separate AI model call with restricted permissions. See the [Week 3 technical write-up](week3_capable/README.md) for details.
 
 ## Architecture, for a closer look
 
-The illustration above shows the mental model. This diagram shows how the roles connect to the actual game, map, and memory components:
+The illustration above shows how Boukensha thinks. This diagram shows how the
+system actually works: how the five AI roles interact, which components can
+access the game, and how knowledge and memory are managed.
 
 ```mermaid
 %%{init: {"flowchart": {"useMaxWidth": false}}}%%
 flowchart TD
-    Input(["Human turn input"]) --> PlanGate{"Plan needed?"}
-    PlanGate -->|"yes"| Planner[["🤖 Planner<br/>writes goal + steps<br/>(no tools)"]]
-    PlanGate -->|"no"| Player
-    Planner --> Player
+    Input([Human turn input])
 
-    subgraph Turn["Player turn"]
+    subgraph Orchestration["AI orchestration"]
         direction TB
-        Player[["🤖 Player"]] -->|"game commands"| MUD[("mud-manager<br/>MCP server")]
-        Player -->|"fuzzy destination"| Navigator[["🤖 Navigator<br/>(read-only)"]]
-        MUD --> Player
-        Navigator --> Player
+        PlanGate{"Plan needed?"}
+        Planner["🤖 Planner<br/>goal + steps<br/>(no tools)"]
+        Player["🤖 Player<br/>reads room + acts"]
+        Navigator["🤖 Navigator<br/>route helper<br/>(read-only, on-demand)"]
+        Judge["🤖 Judge<br/>checkpoint reviewer<br/>(read-only)"]
+        Chronicler["🤖 Chronicler<br/>records lessons<br/>(no tools)"]
     end
 
-    Player --> Judge[["🤖 Judge<br/>checkpoint<br/>(read-only)"]]
-    Judge -.->|"room / route lookups"| KB[("Knowledge store<br/>room map")]
-    Judge -.->|"fuzzy destination"| Navigator
-    Navigator -.->|"room / route lookups"| KB
+    subgraph Game["Game infrastructure"]
+        direction TB
+        MUD["mud-manager<br/>MCP server"]
+        KB[("Knowledge store<br/>room map")]
+    end
 
-    Judge -->|"continue"| Input
-    Judge -->|"replan"| Input
-    Judge -->|"flag (warns; play continues)"| Input
-    Judge -->|"replan or flag"| Chronicler[["🤖 Chronicler<br/>(no tools)"]]
+    subgraph Memory["Persistent memory"]
+        Digest[("Player memory digest")]
+    end
 
-    Boundary(["/exit, /clear, EOF —<br/>independent of the Judge"]) --> Chronicler
-    Chronicler --> Memory[("Player memory<br/>digest")]
-    Memory -.->|"read back next session"| Planner
+    Input --> PlanGate
+    PlanGate -->|yes| Planner
+    PlanGate -->|no| Player
+    Planner --> Player
+
+    Player -->|game commands| MUD
+    MUD -->|game responses| Player
+
+    Player -.->|route assistance| Navigator
+    Navigator -.->|knowledge queries| KB
+
+    Player -->|checkpoint| Judge
+    Judge -.->|inspect world| KB
+    Judge -.->|route assistance| Navigator
+
+    Judge -->|continue| Input
+    Judge -->|replan| Chronicler
+    Judge -->|flag| Chronicler
+    Judge -->|flag: play continues| Input
+
+    Boundary["Session boundary<br/>/exit, /clear, EOF"] --> Chronicler
+
+    Chronicler --> Digest
+    Digest -.->|read during future planning| Planner
+    Chronicler -.->|replan on next turn| PlanGate
+
+    classDef agent fill:#182A44,stroke:#6C9ED6,color:#FFFFFF
+    classDef game fill:#183B37,stroke:#57A995,color:#FFFFFF
+    classDef memory fill:#362747,stroke:#AD83E3,color:#FFFFFF
+    classDef decision fill:#49361D,stroke:#D9A95C,color:#FFFFFF
+
+    class Planner,Player,Navigator,Judge,Chronicler agent
+    class MUD,KB game
+    class Digest memory
+    class PlanGate decision
 ```
 
-The Judge and Navigator are **permission-gated to read-only**. Both use the same in-process room map; the Player receives current-room context directly. The Chronicler writes a bounded memory digest at session boundaries or on `replan`/`flag`, and that memory reaches the Player **through the Planner**, not as an extra tool. For lower-level details, see [Week 3](week3_capable/README.md).
+### Key architectural decisions
 
-<details>
-<summary>A real run (captured 2026-08-10, against a live CircleMUD server — $0.02, not staged)</summary>
+- **Five specialised AI roles.** Planner, Player, Judge, Navigator, and Chronicler are independently configured model calls, each with a specific responsibility.
+- **Permission boundaries.** Only the Player performs game actions. Judge and Navigator have read-only tools, while Planner and Chronicler have no game-action tools.
+- **Shared world knowledge.** The Judge and Navigator query the same in-process room map. The Player receives its current room information directly, avoiding redundant lookups.
+- **Persistent learning.** The Chronicler records lessons on `replan`, `flag`, or session boundaries. Saved memory informs future planning rather than being injected directly into every Player turn.
 
-```text
-$ boukensha --no-tui
-boukensha> Look around, then try moving in one direction, and tell me what you find.
+The diagram shows the main control flow rather than every internal operation.
+Judge checkpoints are periodic, Navigator is consulted only when needed,
+and a `flag` does not automatically stop the game.
 
-[planner]
-Objective: Scout the immediate area to understand the current location and
-available exits.
-Steps: 1. Look around the current room. 2. Move in the safest-looking
-direction. 3. Look around the new room and report back.
-Stop when: You have moved to an adjacent room and reported what you found.
+For implementation details, permission enforcement, session compaction,
+and technical trade-offs, see the
+[Week 3 technical documentation](week3_capable/README.md).
 
-Excellent! I've moved north and found The Great Field Of Midgaard. Here's
-what I discovered:
-
-Current Location: The Great Field Of Midgaard
-Exits: Only south (back to where I came from)
-Description: A beautiful, peaceful countryside with a wide dirt path, lush
-green grass, oak trees, and birds.
-Obstacle: The path north is blocked — no way around it.
-
-Shall I head back south and try a different direction?
-boukensha> /exit
-[chronicler] memory updated for dummy.
-Goodbye.
-```
-
-Two Player turns, two Judge checkpoints (both `continue`), one real memory
-digest written on `/exit`:
-
-```markdown
-## Discoveries
-Started in The Great Field Of Midgaard, a peaceful countryside with wide
-dirt path, lush grass, oak trees. Exits: south to Midgaard city. North is
-blocked... Only safe exit is south back toward the city.
-
-## Open threads
-Explore south toward Midgaard city to find NPCs, shops, or other areas.
-```
-
-</details>
 
 ## Want to go deeper?
 
