@@ -1,8 +1,5 @@
 # Boukensha — an AI that learns to play a text adventure game
 
-This is the repo built for the Claude Code Camp operated by
-[ExamPro](https://www.exampro.co).
-
 ## What is this project?
 
 A MUD ("Multi-User Dungeon") is an old-school, text-only online game: you
