@@ -31,52 +31,32 @@ server throughout, not just tested in theory.
 | **Week 2 — Observability** | Gave the agent a memory of the game *world* (a map of rooms it has visited) and built a dashboard + tracing so a human can watch exactly what it saw and why it acted. |
 | **Week 3 — Capable** *(current)* | Gave the agent four new abilities: to **plan** ahead, **check** its own progress, **find its way** around, and **remember** lessons across separate play sessions. |
 
-## How the current agent thinks
+## How Boukensha thinks
 
-At its core, one loop repeats every time the agent plays:
+One adventurer, five specialised AI roles. Together they help Boukensha explore Midgaard, make decisions, evaluate progress, and carry lessons into future sessions.
 
-```mermaid
-%%{init: {"flowchart": {"useMaxWidth": false}}}%%
-flowchart LR
-    A["🧭🤖 Plan<br/>write down a goal<br/>and a few steps"] --> B["🎮🤖 Play<br/>read the room,<br/>decide, act"]
-    B --> C{"🔍🤖 Check<br/>is this working?"}
-    C -->|"yes, keep going"| B
-    C -->|"not really"| D
-    B -.->|"session wraps up"| D["📝🤖 Remember<br/>write down what<br/>was learned"]
-    D -.->|"back to planning,<br/>next time"| A
-```
+> **Pixel-art process illustration — coming soon.** A visual guide to the five roles will go here: four core stages (Plan → Play → Check → Remember), with Navigator helping the Player or Judge on demand. The illustration will use the same blue, green, red, yellow, and purple characters as the Midgaard artwork.
 
-🤖 marks a step that's an AI model call — all four are, none of this loop is
-scripted logic.
+**The core loop:** **Plan → Play → Check → Continue / Replan / Flag → Remember when needed.**
 
-- **Plan** — before playing, the agent writes itself a short goal and a few
-  concrete steps.
-- **Play** — it reads the room, decides what to type, and sends it — over
-  and over, like a person playing the game turn by turn.
-- **Check** — periodically, a second "reviewer" role looks at what just
-  happened and decides: keep going, or rethink the plan. It can also raise
-  a flag for a human to see — play continues either way, the flag is just a
-  note that something looked off.
-- **Remember** — when a play session wraps up, or the plan changes, the
-  agent writes itself a short note about what it learned, so it isn't
-  starting from scratch next time.
+| Role | What it does | When it runs |
+|---|---|---|
+| 🔵 **Planner — Plan** | Sets an objective, a few concrete steps, and a condition for stopping. | Before play starts, or when a new plan is needed. |
+| 🟢 **Player — Play** | Reads the game's text and takes actions such as moving, looking, and interacting. | During each player turn. |
+| 🔴 **Judge — Check** | Reviews progress and decides to **continue**, **replan**, or **flag** something for a human to inspect. | At configured checkpoints, or when an iteration limit is reached. |
+| 🟡 **Navigator — Find the way** | Consults the known room map to suggest routes or promising unexplored exits. It cannot move the character. | Only when the Player or Judge asks for help. |
+| 🟣 **Chronicler — Remember** | Writes a short record of discoveries, mistakes, strategies, and open threads for a future session. | On a **replan** or **flag**, or when a session ends or clears. |
 
-Each of those four roles is a separate call to an AI model — not scripted
-logic — and each is deliberately limited to only what its job needs: the
-reviewer can't move the character, for instance. That's what makes each one
-trustworthy rather than just another thing that could go wrong, and it's
-also why this is an *orchestration* of several small, narrow AI calls
-rather than one big one doing everything.
+**What happens after a check?** A **continue** verdict lets play carry on; **replan** causes lessons to be recorded and a new plan to be prepared for the next turn; **flag** surfaces a warning without automatically stopping play. Memory is also saved at session boundaries, then made available to the Planner in a future session.
 
-*(For readers who want the code-level names: these four roles are called
-the Planner, Player, Judge, and Chronicler — see
-[`week3_capable/README.md`](week3_capable/README.md) for the full technical
-write-up.)*
+These are **separate AI model calls**, not one model pretending to be five. Each role has a deliberately narrow set of permissions: the Judge and Navigator have read-only access, while the Chronicler and Planner have no game-action tools. The Navigator is *not* a mandatory fifth step in every turn.
+
+For implementation details, see the [Week 3 technical write-up](week3_capable/README.md).
 
 ## Architecture, for a closer look
 
-The diagram above is the mental model; this is the same loop with the
-actual components involved — for reviewers who want to see the shape of the
+The overview above is the mental model; this diagram shows the actual
+components involved — for reviewers who want to see the shape of the
 system without reading source yet:
 
 ```mermaid
