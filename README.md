@@ -2,17 +2,17 @@
   <img src="midgaard-journey.png" alt="Five adventurers journey across the moonlit fields of Midgaard toward a medieval city" width="100%">
 </div>
 
-# Boukensha — an AI that learns to play a text adventure game
+# Boukensha · 冒険者
+*Japanese for “adventurer”*
+
+**An AI agent learning to explore, navigate, and make decisions in a text-based fantasy world.**
 
 ## What is this project?
-
-A MUD ("Multi-User Dungeon") is an old-school, text-only online game. You type commands such as `look`, `north`, or `attack goblin`, and the game responds with descriptions of what happened.
+A MUD ("Multi-User Dungeon") is an old-school, text-based online role-playing game. Think **Dungeons & Dragons, but played through a computer terminal.** Players can explore fantasy worlds, battle creatures, level up their characters, improve their stats, and join guilds — all through written commands such as `look`, `north`, or `attack goblin`. The game then responds with descriptions of what happens next.
 
 **Boukensha** is an AI agent that reads those responses, decides what to do, and sends commands back to the game. Rather than being given every move, it uses specialised AI roles to plan objectives, play, check progress, navigate a growing map, and remember what it learns across sessions.
 
-The project was built incrementally during the coding camp and tested against a real CircleMUD server. Its current interface is a REPL: a human still supplies turn input, while the AI chooses and executes game commands. A fully autonomous outer session loop remains future work.
-
-> In two live sessions costing **$0.10 combined**, the Judge identified a reason to **replan**, and lessons saved from the first session informed planning in the second. The run is documented in [the Week 3 engineering journal](docs/journal/3_capable.md). These runs verify the planning, judging, and memory mechanisms—not that they outperform a single-agent baseline. The Navigator was available but not called in these sessions.
+The project was built incrementally and tested against a real CircleMUD server. Its current interface is a REPL: a human still supplies turn input, while the AI chooses and executes game commands. A fully autonomous outer session loop remains future work.
 
 ## The journey, week by week
 
