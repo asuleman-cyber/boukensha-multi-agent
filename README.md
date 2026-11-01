@@ -33,6 +33,7 @@ One adventurer, five specialised AI roles. Four form the core process; the fifth
 
 This is a **simplified process**, not a fixed sequence on every turn: checks happen at configured checkpoints, navigation is optional, and memory is written conditionally. Each role makes a separate AI model call with restricted permissions. See the [Week 3 technical write-up](week3_capable/README.md) for details.
 
+
 ## Architecture, for a closer look
 
 The illustration above shows how Boukensha thinks. This diagram shows how the
@@ -42,16 +43,16 @@ access the game, and how knowledge and memory are managed.
 ```mermaid
 %%{init: {"flowchart": {"useMaxWidth": false}}}%%
 flowchart TD
-    Input([Human turn input])
+    Input(["🧑 Human instruction"])
 
     subgraph Orchestration["AI orchestration"]
         direction TB
         PlanGate{"Plan needed?"}
-        Planner["🤖 Planner<br/>goal + steps<br/>(no tools)"]
-        Player["🤖 Player<br/>reads room + acts"]
-        Navigator["🤖 Navigator<br/>route helper<br/>(read-only, on-demand)"]
-        Judge["🤖 Judge<br/>checkpoint reviewer<br/>(read-only)"]
-        Chronicler["🤖 Chronicler<br/>records lessons<br/>(no tools)"]
+        Planner["🧙 Planner<br/>goal + steps<br/>(no tools)"]
+        Player["⚔️ Player<br/>reads room + acts"]
+        Navigator["🧙 Navigator<br/>route helper<br/>(read-only, on-demand)"]
+        Judge["🧙 Judge<br/>checkpoint reviewer<br/>(read-only)"]
+        Chronicler["🧙 Chronicler<br/>records lessons<br/>(no tools)"]
     end
 
     subgraph Game["Game infrastructure"]
@@ -91,11 +92,13 @@ flowchart TD
     Chronicler -.->|replan on next turn| PlanGate
 
     classDef agent fill:#182A44,stroke:#6C9ED6,color:#FFFFFF
+    classDef player fill:#183B37,stroke:#57A995,color:#FFFFFF
     classDef game fill:#183B37,stroke:#57A995,color:#FFFFFF
     classDef memory fill:#362747,stroke:#AD83E3,color:#FFFFFF
     classDef decision fill:#49361D,stroke:#D9A95C,color:#FFFFFF
 
-    class Planner,Player,Navigator,Judge,Chronicler agent
+    class Planner,Navigator,Judge,Chronicler agent
+    class Player player
     class MUD,KB game
     class Digest memory
     class PlanGate decision
@@ -115,7 +118,6 @@ and a `flag` does not automatically stop the game.
 For implementation details, permission enforcement, session compaction,
 and technical trade-offs, see the
 [Week 3 technical documentation](week3_capable/README.md).
-
 
 ## Want to go deeper?
 
