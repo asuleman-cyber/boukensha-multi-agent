@@ -14,15 +14,6 @@ A MUD ("Multi-User Dungeon") is an old-school, text-based online role-playing ga
 
 The project was built incrementally and tested against a real CircleMUD server. Its current interface is a REPL: a human still supplies turn input, while the AI chooses and executes game commands. A fully autonomous outer session loop remains future work.
 
-## The journey, week by week
-
-| Week | What was added |
-|---|---|
-| **Week 0 — Explore** | Connected to the text game and learned to send and receive commands. |
-| **Week 1 — Baseline** | Built the first working read → decide → act agent. |
-| **Week 2 — Observability** | Added a persistent room map, tracing, and a dashboard to inspect the agent's decisions. |
-| **Week 3 — Capable** *(current)* | Added planning, checkpoints, navigation assistance, and memory across sessions. |
-
 ## How Boukensha thinks
 
 One adventurer, five specialised AI roles. Four form the core process; the fifth, Navigator, helps when directions are needed.
@@ -33,6 +24,15 @@ One adventurer, five specialised AI roles. Four form the core process; the fifth
 
 This is a **simplified process**, not a fixed sequence on every turn: checks happen at configured checkpoints, navigation is optional, and memory is written conditionally. Each role makes a separate AI model call with restricted permissions. See the [Week 3 technical write-up](week3_capable/README.md) for details.
 
+
+## Project journey, week by week
+
+| Week | What was added |
+|---|---|
+| **Week 0 — Explore** | Connected to the text game and learned to send and receive commands. |
+| **Week 1 — Baseline** | Built the first working read → decide → act agent. |
+| **Week 2 — Observability** | Added a persistent room map, tracing, and a dashboard to inspect the agent's decisions. |
+| **Week 3 — Capable** *(current)* | Added planning, checkpoints, navigation assistance, and memory across sessions. |
 
 ## Architecture, for a closer look
 
